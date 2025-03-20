@@ -13,9 +13,9 @@ class Game {
         console.log("THREE object is available");
         console.log("CANNON object is available");
         
-        // Enable debug mode for physics troubleshooting
-        this.debugMode = true;
-        console.log("Debug mode enabled for physics troubleshooting");
+        // Disable debug mode as requested
+        this.debugMode = false;
+        console.log("Debug mode disabled for better gameplay experience");
         
         // Initialize properties
         this.scene = null;
@@ -42,23 +42,31 @@ class Game {
             this.scene = new THREE.Scene();
             console.log("Scene created");
             
-            // Use a more distant fog for better visibility
-            this.scene.fog = new THREE.Fog(0x87CEEB, 10, 30);
+            // Use a more distant fog for better visibility with infinite terrain
+            this.scene.fog = new THREE.Fog(0x87CEEB, 20, 100);
             
             // Set a sky blue background
             this.scene.background = new THREE.Color(0x87CEEB);
             
-            // Create the renderer
-            this.renderer = new THREE.WebGLRenderer({ antialias: true });
+            // Create the renderer with enhanced settings
+            this.renderer = new THREE.WebGLRenderer({ 
+                antialias: true,
+                alpha: true,
+                precision: 'highp' 
+            });
             this.renderer.setSize(window.innerWidth, window.innerHeight);
             this.renderer.shadowMap.enabled = true;
             this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Better performance on high-DPI displays
+            this.renderer.outputEncoding = THREE.sRGBEncoding; // Better color accuracy
+            this.renderer.toneMapping = THREE.ACESFilmicToneMapping; // Better contrast
+            this.renderer.toneMappingExposure = 1.0;
             document.body.appendChild(this.renderer.domElement);
-            console.log("Renderer created and added to DOM");
+            console.log("Enhanced renderer created with improved visual settings");
             
             // Create a temporary camera (will be replaced by player camera)
-            this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 30);
-            console.log("Initial camera created");
+            this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.01, 100);
+            console.log("Initial camera created with extended far plane for infinite terrain");
             
             // Resize handler
             window.addEventListener('resize', this.onWindowResize.bind(this));
@@ -69,7 +77,7 @@ class Game {
             // Set up lighting
             this.createLighting();
             
-            // Create debug helpers
+            // Create debug helpers only if debug mode is on
             if (this.debugMode) {
                 this.setupDebugHelpers();
             }
@@ -102,6 +110,9 @@ class Game {
             if (this.debugMode) {
                 this.addGroundCheckPoint();
             }
+            
+            // Add sky and environment
+            this.createSkyAndEnvironment();
             
             console.log("Game initialized successfully");
             
@@ -172,35 +183,61 @@ class Game {
         this.world = new CANNON.World();
         this.world.gravity.set(0, -9.82, 0);
         
-        // Set solver parameters for better bounce behavior
-        this.world.solver.iterations = 30;             // More iterations for accuracy
-        this.world.solver.tolerance = 0.001;           // Tighter tolerance
+        // Set solver parameters for better terrain interaction
+        this.world.solver.iterations = 50;             // Even more iterations for terrain friction accuracy
+        this.world.solver.tolerance = 0.0005;          // Tighter tolerance for precision
         
-        // More accurate collision detection for proper bouncing
-        this.world.defaultContactMaterial.contactEquationStiffness = 1e8;
+        // More accurate collision detection for proper friction
+        this.world.defaultContactMaterial.contactEquationStiffness = 5e8;  // Higher stiffness
         this.world.defaultContactMaterial.contactEquationRelaxation = 3;
         
+        // Better friction equation properties for terrain
+        this.world.defaultContactMaterial.frictionEquationStiffness = 5e7;  // Increased for better friction
+        this.world.defaultContactMaterial.frictionEquationRelaxation = 3;
+        
         // Default material properties
-        this.world.defaultContactMaterial.friction = 0.3;
-        this.world.defaultContactMaterial.restitution = 0.9;    // Higher default bounciness
+        this.world.defaultContactMaterial.friction = 0.6;       // Increased default friction
+        this.world.defaultContactMaterial.restitution = 0.5;    // Moderate bounciness
         
         // Use smaller time step for more accurate simulation
-        this.world.fixedTimeStep = 1/180;             // Even smaller time step for bounce accuracy
+        this.world.fixedTimeStep = 1/240;             // Even smaller time step for terrain sensitivity
         
         // Allow more substeps for better stability
         this.world.quatNormalizeFast = false;         // More accurate quaternion normalization
         this.world.quatNormalizeSkip = 0;             // Don't skip normalizations
         
-        // Set broadphase algorithm
-        this.world.broadphase = new CANNON.NaiveBroadphase();
+        // Set more accurate broadphase algorithm
+        this.world.broadphase = new CANNON.SAPBroadphase(this.world);  // More precise algorithm
+        
+        // Enable split impulses for better contact resolution (helps with terrain)
+        this.world.solver.split = true;  // Better contact stability
         
         // Enable continuous collision detection
-        this.world.allowSleep = false;
+        this.world.allowSleep = true;   // Enable sleeping for static terrain
+        this.world.sleepTimeLimit = 1.0; // Sleep more quickly for optimization
+        this.world.sleepSpeedLimit = 0.1; // Sleep at lower speeds
         
         // Debug physics objects
         this.world.addEventListener('postStep', () => {
             if (this.frameCount % 60 === 0 && this.debugMode) {
                 console.log(`Physics world has ${this.world.bodies.length} bodies and ${this.world.constraints.length} constraints`);
+                
+                // Check terrain interactions for active marble
+                if (this.player && this.player.activeMarble) {
+                    const body = this.player.activeMarble.body;
+                    const vel = body.velocity;
+                    const speed = vel.length();
+                    
+                    // Log useful debug info for terrain interactions
+                    console.log(`Marble speed: ${speed.toFixed(3)}, ` +
+                               `Position: (${body.position.x.toFixed(2)}, ${body.position.y.toFixed(2)}, ${body.position.z.toFixed(2)}), ` +
+                               `Velocity: (${vel.x.toFixed(2)}, ${vel.y.toFixed(2)}, ${vel.z.toFixed(2)})`);
+                    
+                    // Check ground contact
+                    if (body.position.y < 0.1 && Math.abs(vel.y) < 0.1) {
+                        console.log("Marble in ground contact - friction should be applied");
+                    }
+                }
                 
                 // Check if any bodies are at positions we don't expect
                 for (let i = 0; i < this.world.bodies.length; i++) {
@@ -212,26 +249,26 @@ class Game {
             }
         });
         
-        console.log("Physics world optimized for realistic bouncing behavior");
+        console.log("Physics world optimized for realistic terrain interaction and friction");
     }
     
     createLighting() {
         // Ambient light (brighter for better visibility)
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         this.scene.add(ambientLight);
         
         // Main directional light (simulating sun)
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-        dirLight.position.set(5, 10, 5); // Higher and further away
+        const dirLight = new THREE.DirectionalLight(0xfffaf3, 1.2); // Warmer sunlight color
+        dirLight.position.set(5, 12, 7); // Higher and further away
         dirLight.castShadow = true;
         
-        // Wider shadow camera for better coverage
-        dirLight.shadow.camera.left = -10;
-        dirLight.shadow.camera.right = 10;
-        dirLight.shadow.camera.top = 10;
-        dirLight.shadow.camera.bottom = -10;
+        // Wider shadow camera for better coverage of infinite terrain
+        dirLight.shadow.camera.left = -15;
+        dirLight.shadow.camera.right = 15;
+        dirLight.shadow.camera.top = 15;
+        dirLight.shadow.camera.bottom = -15;
         dirLight.shadow.camera.near = 0.5;
-        dirLight.shadow.camera.far = 30;
+        dirLight.shadow.camera.far = 35;
         
         // Higher resolution shadows
         dirLight.shadow.mapSize.width = 2048;
@@ -239,15 +276,22 @@ class Game {
         
         // Better shadow quality
         dirLight.shadow.bias = -0.0001;
+        dirLight.shadow.normalBias = 0.02;
         
         this.scene.add(dirLight);
         
         // Add a hemisphere light for better ambient illumination
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+        const hemiLight = new THREE.HemisphereLight(0xffeeb1, 0x080820, 0.5); // Sky color, ground color, intensity
         hemiLight.position.set(0, 20, 0);
         this.scene.add(hemiLight);
         
-        console.log("Lighting created");
+        // Add a subtle orange fill light to simulate bounce light from terrain
+        const fillLight = new THREE.DirectionalLight(0xffa95c, 0.3);
+        fillLight.position.set(-5, 3, -5);
+        fillLight.castShadow = false;
+        this.scene.add(fillLight);
+        
+        console.log("Enhanced lighting created with improved colors and shadows");
     }
     
     createUI() {
@@ -388,15 +432,15 @@ class Game {
             const cappedDelta = Math.min(deltaTime, 1/30);
             
             // Use multiple substeps for better physics stability
-            // This helps with bounce accuracy
-            const maxSubSteps = 10;  // More substeps for accuracy
-            const fixedTimeStep = 1/180;
+            // This helps with terrain interaction accuracy
+            const maxSubSteps = 16;  // Even more substeps for terrain accuracy
+            const fixedTimeStep = 1/240;
             
             // Update physics with sub-steps for more accurate simulation
             this.world.step(fixedTimeStep, cappedDelta, maxSubSteps);
             
             // Check collision issues - find all CANNON bodies
-            if (this.frameCount % 60 === 0 && this.debugMode) {
+            if (this.frameCount % 30 === 0 && this.debugMode) {
                 if (this.player && this.player.activeMarble) {
                     // Check for collisions between marble and terrain
                     const marble = this.player.activeMarble.body;
@@ -407,6 +451,16 @@ class Game {
                         const terrainHeight = this.terrain.getHeightAt(marblePos.x, marblePos.z);
                         const distToTerrain = marblePos.y - terrainHeight;
                         
+                        // Sample terrain heights around marble to detect slopes
+                        const sampleDist = 0.05; // 5cm sampling distance
+                        const forwardX = marblePos.x + marble.velocity.x * 0.2; // Sample in direction of travel
+                        const forwardZ = marblePos.z + marble.velocity.z * 0.2;
+                        const forwardHeight = this.terrain.getHeightAt(forwardX, forwardZ);
+                        
+                        // Calculate slope
+                        const heightDiff = forwardHeight - terrainHeight;
+                        const isUphill = heightDiff > 0.001;
+                        
                         // Update debug status
                         const debugStatus = document.getElementById('debug-status');
                         if (debugStatus) {
@@ -415,17 +469,16 @@ class Game {
                                 Marble: (${marblePos.x.toFixed(2)}, ${marblePos.y.toFixed(2)}, ${marblePos.z.toFixed(2)})<br>
                                 Terrain height: ${terrainHeight.toFixed(3)}<br>
                                 Distance to terrain: ${distToTerrain.toFixed(3)}<br>
-                                Velocity: (${marble.velocity.y.toFixed(2)})<br>
+                                Slope: ${heightDiff.toFixed(3)} (${isUphill ? 'Uphill' : 'Downhill'})<br>
+                                Velocity: (${marble.velocity.x.toFixed(2)}, ${marble.velocity.y.toFixed(2)}, ${marble.velocity.z.toFixed(2)})<br>
+                                Speed: ${marble.velocity.length().toFixed(2)}<br>
                                 Bounces: ${this.player.activeMarble.bounceCount || 0}
                             `;
                         }
                         
-                        if (distToTerrain < 0.01 && marble.velocity.y < 0) {
-                            console.log("Marble near terrain but not bouncing. Forcing upward velocity for debugging.");
-                            // Force a small upward velocity to see if physics is working
-                            if (this.debugMode && this.frameCount % 300 === 0) {
-                                marble.velocity.y = 1.0;
-                            }
+                        // Additional debug output to console
+                        if (distToTerrain < 0.02 && marble.velocity.length() > 0.1) {
+                            console.log(`Marble on terrain - Slope: ${heightDiff.toFixed(4)}, Speed: ${marble.velocity.length().toFixed(2)}`);
                         }
                     }
                     
@@ -482,6 +535,122 @@ class Game {
             this.renderer.render(this.scene, this.camera);
         } catch (error) {
             console.error("Error in game loop:", error);
+        }
+    }
+    
+    createSkyAndEnvironment() {
+        // Create a simple sky dome for better visuals
+        const skyGeometry = new THREE.SphereGeometry(90, 32, 32);
+        // Flip the geometry inside out
+        skyGeometry.scale(-1, 1, 1);
+        
+        // Create gradient sky material
+        const vertexShader = `
+            varying vec3 vWorldPosition;
+            void main() {
+                vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                vWorldPosition = worldPosition.xyz;
+                gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+        `;
+        
+        const fragmentShader = `
+            uniform vec3 topColor;
+            uniform vec3 bottomColor;
+            uniform float offset;
+            uniform float exponent;
+            varying vec3 vWorldPosition;
+            void main() {
+                float h = normalize(vWorldPosition + offset).y;
+                gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+            }
+        `;
+        
+        const uniforms = {
+            topColor: { value: new THREE.Color(0x0077ff) },
+            bottomColor: { value: new THREE.Color(0xffffff) },
+            offset: { value: 33 },
+            exponent: { value: 0.6 }
+        };
+        
+        const skyMaterial = new THREE.ShaderMaterial({
+            vertexShader: vertexShader,
+            fragmentShader: fragmentShader,
+            uniforms: uniforms,
+            side: THREE.BackSide
+        });
+        
+        const sky = new THREE.Mesh(skyGeometry, skyMaterial);
+        this.scene.add(sky);
+        
+        // Add distant 3D clouds for visual interest
+        this.addDecorations();
+        
+        console.log("Added sky dome and environmental elements");
+    }
+    
+    addDecorations() {
+        // Add distant hills and mountains beyond the infinite terrain
+        for (let i = 0; i < 12; i++) {
+            const distance = 70 + Math.random() * 20;
+            const angle = Math.random() * Math.PI * 2;
+            const x = Math.cos(angle) * distance;
+            const z = Math.sin(angle) * distance;
+            
+            // Create a large hill or small mountain
+            const radius = 10 + Math.random() * 15;
+            const height = 5 + Math.random() * 10;
+            
+            const hillGeometry = new THREE.ConeGeometry(radius, height, 8);
+            const hillMaterial = new THREE.MeshStandardMaterial({
+                color: 0x3c2e1c,  // Dark brown
+                roughness: 0.9,
+                metalness: 0.1,
+                flatShading: true
+            });
+            
+            const hill = new THREE.Mesh(hillGeometry, hillMaterial);
+            hill.position.set(x, -1, z);
+            this.scene.add(hill);
+        }
+        
+        // Add simple cloud puffs
+        for (let i = 0; i < 20; i++) {
+            const cloudGroup = new THREE.Group();
+            
+            // Create a cluster of spheres for each cloud
+            const puffCount = 3 + Math.floor(Math.random() * 5);
+            for (let j = 0; j < puffCount; j++) {
+                const puffSize = 5 + Math.random() * 3;
+                const geometry = new THREE.SphereGeometry(puffSize, 7, 7);
+                const material = new THREE.MeshStandardMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.7 + Math.random() * 0.3,
+                    roughness: 1.0,
+                    metalness: 0.0
+                });
+                
+                const puff = new THREE.Mesh(geometry, material);
+                puff.position.set(
+                    (Math.random() - 0.5) * 10,
+                    (Math.random() - 0.5) * 3,
+                    (Math.random() - 0.5) * 10
+                );
+                
+                cloudGroup.add(puff);
+            }
+            
+            // Position the cloud in the sky
+            const cloudDist = 80 + Math.random() * 15;
+            const angle = Math.random() * Math.PI * 2;
+            cloudGroup.position.set(
+                Math.cos(angle) * cloudDist,
+                20 + Math.random() * 15,
+                Math.sin(angle) * cloudDist
+            );
+            
+            this.scene.add(cloudGroup);
         }
     }
 } 

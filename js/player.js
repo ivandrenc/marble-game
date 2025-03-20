@@ -61,30 +61,30 @@ class Player {
     createMarbleMaterials() {
         // Create physics material for the marble with improved properties for terrain interaction
         this.marbleMaterial = new CANNON.Material('marbleMaterial');
-        this.marbleMaterial.friction = 0.6;      // Higher friction to interact with terrain obstacles
-        this.marbleMaterial.restitution = 0.7;   // Slightly reduced restitution to avoid excessive bouncing on hills
+        this.marbleMaterial.friction = 0.95;      // Very high friction to detect micro-bumps
+        this.marbleMaterial.restitution = 0.5;    // Moderate restitution for balanced bounce behavior
 
         // Create contact material between marble and ground
         if (this.terrain && this.terrain.body && this.terrain.body.material) {
             const terrainMaterial = this.terrain.body.material;
             
-            // Create the contact material with improved properties for realistic interactions
+            // Create the contact material with improved properties for micro-terrain sensitivity
             this.marbleTerrainContact = new CANNON.ContactMaterial(
                 this.marbleMaterial,
                 terrainMaterial,
                 {
-                    friction: 0.5,                    // Higher friction to be affected by terrain
-                    restitution: 0.7,                 // Slightly reduced restitution
-                    contactEquationStiffness: 1e8,    // Stiffer contact for more responsive interactions
+                    friction: 0.95,                   // Very high friction to feel every bump
+                    restitution: 0.5,                 // Moderate restitution for natural feel
+                    contactEquationStiffness: 5e8,    // Stiffer contact for micro-feature detection
                     contactEquationRelaxation: 3,     // Relaxation for stable contacts
-                    frictionEquationStiffness: 1e7,   // Stiffness for better friction
-                    frictionEquationRelaxation: 3     // Relaxation for better friction
+                    frictionEquationStiffness: 5e7,   // Higher stiffness for sensitive friction response
+                    frictionEquationRelaxation: 3     // Balanced relaxation
                 }
             );
             
             // Add to world
             this.world.addContactMaterial(this.marbleTerrainContact);
-            console.log("Marble-terrain contact material created with enhanced obstacle interaction");
+            console.log("Marble-terrain contact material created for micro-terrain interaction");
 
             // Also create a contact material with the backup ground plane
             const groundMaterial = new CANNON.Material('groundMaterial');
@@ -92,9 +92,9 @@ class Player {
                 this.marbleMaterial,
                 groundMaterial,
                 {
-                    friction: 0.5,
-                    restitution: 0.7,
-                    contactEquationStiffness: 1e8,
+                    friction: 0.95,                  // Very high friction for backup plane
+                    restitution: 0.5,                // Moderate restitution
+                    contactEquationStiffness: 5e8,
                     contactEquationRelaxation: 3
                 }
             );
@@ -106,8 +106,8 @@ class Player {
                 this.marbleMaterial,
                 new CANNON.Material(),
                 {
-                    friction: 0.5,
-                    restitution: 0.7     // Slightly less bouncy for better obstacle interaction
+                    friction: 0.95,
+                    restitution: 0.5
                 }
             );
             this.world.addContactMaterial(this.marbleTerrainContact);
@@ -119,9 +119,9 @@ class Player {
             this.marbleMaterial,
             defaultMaterial,
             {
-                friction: 0.5,
-                restitution: 0.7,
-                contactEquationStiffness: 1e8,
+                friction: 0.95,
+                restitution: 0.5,
+                contactEquationStiffness: 5e8,
                 contactEquationRelaxation: 3
             }
         );
@@ -133,14 +133,14 @@ class Player {
             this.marbleMaterial,
             rockMaterial,
             {
-                friction: 0.9,                // Very high friction for rocks to really affect marble
-                restitution: 0.4,             // Lower restitution for more "solid" feel with rocks
-                contactEquationStiffness: 1e8,
+                friction: 0.95,                // Very high friction to stop on rocks
+                restitution: 0.4,             // Lower restitution for rocks
+                contactEquationStiffness: 5e8,
                 contactEquationRelaxation: 3
             }
         );
         this.world.addContactMaterial(marbleRockContact);
-        console.log("Added specialized rock contact material for better obstacle interaction");
+        console.log("Added specialized rock contact material for enhanced obstacle interaction");
     }
     
     createMarblePreview() {
@@ -187,15 +187,15 @@ class Player {
         
         // Create the body with physics properties optimized for terrain interaction
         const marbleBody = new CANNON.Body({
-            mass: 0.05,                    // 50 grams - glass marble weight
+            mass: 0.05,                     // 50 grams (lighter to be more affected by small bumps)
             material: this.marbleMaterial,
-            linearDamping: 0.1,            // Increased damping for better stability on terrain
-            angularDamping: 0.1,           // Increased angular damping for better obstacle interaction
-            allowSleep: false,             // Don't allow sleep until we're sure terrain interaction works
-            fixedRotation: false,          // Allow rotation for realistic behavior
-            collisionFilterGroup: 1,       // Put in default group
-            collisionFilterMask: -1,       // Collide with everything
-            type: CANNON.Body.DYNAMIC      // Ensure it's dynamic
+            linearDamping: 0.2,             // Increased damping to be more sensitive to terrain
+            angularDamping: 0.1,            // Moderate angular damping for natural rolling
+            allowSleep: false,              // Don't allow sleep for continuous terrain interaction
+            fixedRotation: false,           // Allow rotation for realistic behavior
+            collisionFilterGroup: 1,        // Put in default group
+            collisionFilterMask: -1,        // Collide with everything
+            type: CANNON.Body.DYNAMIC       // Ensure it's dynamic
         });
         
         // Add the sphere shape to the body
@@ -228,19 +228,19 @@ class Player {
         }
         
         // Calculate a throw trajectory with proper vertical component
-        // Lower upward component to make terrain features more noticeable
+        // Use a lower upward component to better show terrain interaction
         const throwDirection = new CANNON.Vec3(
             dirToCenter.x,
-            Math.max(0.5, this.throwPower * 0.15), // Reduced upward component for terrain sensitivity
+            Math.max(0.2, this.throwPower * 0.1), // Lower upward component for better terrain feel
             dirToCenter.z
         );
         
         // Normalize the direction and then scale by power
         throwDirection.normalize();
         
-        // Apply more horizontal power relative to vertical for better terrain interaction
-        let horizontalPower = this.throwPower * 1.2; // More horizontal movement
-        let verticalPower = this.throwPower * 0.8;   // Less vertical movement
+        // Apply power with emphasis on horizontal movement for better terrain interaction
+        let horizontalPower = this.throwPower * 1.3; // More horizontal movement
+        let verticalPower = this.throwPower * 0.7;   // Less vertical movement
         
         marbleBody.velocity.set(
             throwDirection.x * horizontalPower,
@@ -248,19 +248,19 @@ class Player {
             throwDirection.z * horizontalPower
         );
         
-        // Add spin for more realistic bounce behavior, but less than before
+        // Add less spin so terrain features are more noticeable
         marbleBody.angularVelocity.set(
-            random(-7, 7),
-            random(-3, 3),
-            random(-7, 7)
+            random(-5, 5),
+            random(-2, 2),
+            random(-5, 5)
         );
         
         // Enable collision response
         marbleBody.collisionResponse = true;
         
         // Set additional physics properties for better terrain interaction
-        marbleBody.sleepSpeedLimit = 0.01;  // Don't sleep until very slow
-        marbleBody.sleepTimeLimit = 2;      // Wait longer before sleeping
+        marbleBody.sleepSpeedLimit = 0.005;  // Even lower sleep threshold to feel small terrain features
+        marbleBody.sleepTimeLimit = 1;      // Sleep sooner when stuck in terrain features
         
         // Track whether the marble has encountered obstacles
         marbleBody.userData = { 
@@ -294,11 +294,39 @@ class Player {
                 
                 console.log("Obstacle collision detected! Total:", marbleBody.userData.obstacleCollisions);
                 
-                // Reduce velocity slightly on significant impacts for more realistic behavior
-                if (relativeVelocity > 2.5) {
-                    const velocityScale = 0.85; // 15% energy loss on significant impacts
-                    marbleBody.velocity.scale(velocityScale, marbleBody.velocity);
-                    console.log("Significant impact - reduced velocity by 15%");
+                // Apply additional speed reduction when hit obstacles for more realistic behavior
+                const timeSinceCollision = performance.now() - this.activeMarble.body.userData.lastObstacleCollision;
+                if (timeSinceCollision < 500) { // Recent collision
+                    // Apply rolling resistance - slow down faster on horizontal movement
+                    const horizSpeed = Math.sqrt(
+                        this.activeMarble.body.velocity.x * this.activeMarble.body.velocity.x + 
+                        this.activeMarble.body.velocity.z * this.activeMarble.body.velocity.z
+                    );
+                    
+                    if (horizSpeed > 0.2) { // Lower threshold to respond to smaller terrain changes
+                        const resistance = 0.95; // 5% reduction per frame after any terrain impact
+                        this.activeMarble.body.velocity.x *= resistance;
+                        this.activeMarble.body.velocity.z *= resistance;
+                    }
+                }
+            }
+            
+            // Apply continuous terrain sensitivity by reducing velocity slightly on each contact
+            // This helps the marble naturally follow terrain undulations
+            const speed = marbleBody.velocity.length();
+            if (speed > 0.2) {
+                // Subtle general velocity reduction on any terrain contact (0.5%)
+                const terrainResistance = 0.995;
+                
+                // Apply only to horizontal components to maintain bouncing
+                const horizSpeed = Math.sqrt(
+                    marbleBody.velocity.x * marbleBody.velocity.x + 
+                    marbleBody.velocity.z * marbleBody.velocity.z
+                );
+                
+                if (horizSpeed > 0.2) {
+                    marbleBody.velocity.x *= terrainResistance;
+                    marbleBody.velocity.z *= terrainResistance;
                 }
             }
         });
@@ -427,8 +455,8 @@ class Player {
                                 this.activeMarble.body.velocity.z * this.activeMarble.body.velocity.z
                             );
                             
-                            if (horizSpeed > 0.5) {
-                                const resistance = 0.98; // 2% reduction per frame after obstacle hit
+                            if (horizSpeed > 0.2) { // Lower threshold to respond to smaller terrain changes
+                                const resistance = 0.95; // 5% reduction per frame after any terrain impact
                                 this.activeMarble.body.velocity.x *= resistance;
                                 this.activeMarble.body.velocity.z *= resistance;
                             }
@@ -540,6 +568,87 @@ class Player {
                     
                     // Remove the marble
                     this.removeActiveMarble();
+                }
+                
+                // Apply continuous terrain interaction - sample terrain more frequently
+                if (this.activeMarble.body.position.y < 0.5) { // Only when near terrain
+                    // Get current terrain height at marble position
+                    const x = this.activeMarble.body.position.x;
+                    const z = this.activeMarble.body.position.z;
+                    const terrainHeight = this.terrain.getHeightAt(x, z);
+                    
+                    // Calculate terrain gradient by sampling in multiple directions
+                    const sampleDistance = 0.03; // Smaller sampling distance for micro features (3cm)
+                    
+                    // Sample in the direction of travel
+                    const velX = this.activeMarble.body.velocity.x;
+                    const velZ = this.activeMarble.body.velocity.z;
+                    const horizSpeed = Math.sqrt(velX * velX + velZ * velZ);
+                    
+                    if (horizSpeed > 0.01) { // Only if we're moving horizontally
+                        // Normalize velocity direction
+                        const dirX = velX / horizSpeed;
+                        const dirZ = velZ / horizSpeed;
+                        
+                        // Sample height in direction of travel
+                        const forwardHeight = this.terrain.getHeightAt(
+                            x + dirX * sampleDistance,
+                            z + dirZ * sampleDistance
+                        );
+                        
+                        // Calculate height difference (positive = uphill)
+                        const heightDiff = forwardHeight - terrainHeight;
+                        
+                        // Apply resistance based on slope - more resistance going uphill
+                        if (heightDiff > 0.001) { // Going uphill
+                            // Stronger resistance on steeper slopes - cubic relationship
+                            const slopeSteepness = Math.min(0.03, heightDiff) / 0.03; // Normalize to 0-1
+                            const uphillResistance = 1.0 - (slopeSteepness * slopeSteepness * 0.07);
+                            
+                            // Apply resistance to horizontal velocity components
+                            this.activeMarble.body.velocity.x *= uphillResistance;
+                            this.activeMarble.body.velocity.z *= uphillResistance;
+                            
+                            // Apply a tiny boost to Y velocity for small bumps to prevent getting stuck
+                            if (this.activeMarble.body.velocity.y < 0.1 && horizSpeed > 0.5) {
+                                const bumpBoost = heightDiff * 5; // Scale with height difference
+                                this.activeMarble.body.velocity.y += Math.min(0.05, bumpBoost);
+                            }
+                        }
+                        
+                        // Apply micro-resistance even on flat terrain to simulate soil texture
+                        const microResistance = 0.998; // Very subtle 0.2% reduction per frame
+                        this.activeMarble.body.velocity.x *= microResistance;
+                        this.activeMarble.body.velocity.z *= microResistance;
+                    }
+                    
+                    // Apply rolling behavior when marble is almost stopped
+                    const speed = this.activeMarble.body.velocity.length();
+                    if (speed < 0.5 && this.activeMarble.body.position.y < 0.1) {
+                        // Check if we're on a slope that should cause rolling
+                        const leftHeight = this.terrain.getHeightAt(x - sampleDistance, z);
+                        const rightHeight = this.terrain.getHeightAt(x + sampleDistance, z);
+                        const frontHeight = this.terrain.getHeightAt(x, z + sampleDistance);
+                        const backHeight = this.terrain.getHeightAt(x, z - sampleDistance);
+                        
+                        // Calculate slope gradients
+                        const xGradient = (rightHeight - leftHeight) / (2 * sampleDistance);
+                        const zGradient = (frontHeight - backHeight) / (2 * sampleDistance);
+                        
+                        // If on a slope, add a small velocity in the downhill direction
+                        const slopeThreshold = 0.05; // Minimum slope to cause rolling
+                        const maxRollAccel = 0.02;   // Maximum acceleration from slope
+                        
+                        if (Math.abs(xGradient) > slopeThreshold || Math.abs(zGradient) > slopeThreshold) {
+                            // Apply force in the direction of the slope
+                            const rollAccelX = -xGradient * maxRollAccel; // Negative because downhill is opposite to gradient
+                            const rollAccelZ = -zGradient * maxRollAccel;
+                            
+                            // Add to velocity
+                            this.activeMarble.body.velocity.x += rollAccelX;
+                            this.activeMarble.body.velocity.z += rollAccelZ;
+                        }
+                    }
                 }
             }
             
