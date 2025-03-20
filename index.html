@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Marble Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            touch-action: none; /* Prevent default touch actions */
+            background-color: #87CEEB; /* Sky blue fallback background */
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            display: block;
+        }
+        #debug {
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            pointer-events: none;
+            z-index: 1000;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 24px;
+            text-align: center;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+        #power-meter {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 20px;
+            border: 2px solid white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+        #power-level {
+            width: 0%;
+            height: 100%;
+            background-color: green;
+            transition: width 0.1s ease-out;
+        }
+        #error-container {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(255, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            max-width: 80%;
+            display: none;
+        }
+        #retry-button {
+            margin-top: 20px;
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #debug-toggle {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.5);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            cursor: pointer;
+            z-index: 1000;
+        }
+        #debug-panel {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-width: 300px;
+            max-height: 150px;
+            overflow-y: auto;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading message -->
+    <div id="loading">Loading Marble Game...</div>
+    
+    <!-- Debug panel (hidden by default) -->
+    <div id="debug" style="display: none;"></div>
+    
+    <!-- Power meter for throwing -->
+    <div id="power-meter">
+        <div id="power-level"></div>
+    </div>
+    
+    <div id="error-container">
+        <div id="error-message"></div>
+        <button id="retry-button">Retry</button>
+    </div>
+    
+    <div id="debug-toggle">Debug</div>
+    <div id="debug-panel"></div>
+    
+    <!-- Libraries -->
+    <script src="lib/three.min.js"></script>
+    <script src="lib/cannon.min.js"></script>
+    
+    <!-- Utility scripts -->
+    <script src="js/utils.js"></script>
+    <script src="js/utilities.js"></script>
+    
+    <!-- Game scripts -->
+    <script src="js/terrain.js"></script>
+    <script src="js/player.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/main.js"></script>
+    
+    <!-- Load the debug renderer -->
+    <script src="cannon-debug.js"></script>
+    
+    <script>
+        // Show debug panel with keyboard shortcut
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'd' && e.ctrlKey) {
+                const debugEl = document.getElementById('debug');
+                debugEl.style.display = debugEl.style.display === 'none' ? 'block' : 'none';
+            }
+        });
+        
+        // Hide loading message when game is ready
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                const loadingEl = document.getElementById('loading');
+                if (loadingEl) {
+                    loadingEl.style.display = 'none';
+                }
+            }, 1000); // Hide after 1 second
+        });
+        
+        // Wait for DOM to load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Show loading message
+            document.getElementById('loading').style.display = 'block';
+            
+            // Setup debug panel toggling
+            const debugToggle = document.getElementById('debug-toggle');
+            const debugPanel = document.getElementById('debug-panel');
+            
+            debugToggle.addEventListener('click', function() {
+                if (debugPanel.style.display === 'none' || !debugPanel.style.display) {
+                    debugPanel.style.display = 'block';
+                    debugToggle.style.display = 'none';
+                } else {
+                    debugPanel.style.display = 'none';
+                }
+            });
+            
+            // Create console log interceptor for debug panel
+            if (!window.console._originalLog) {
+                window.console._originalLog = window.console.log;
+                window.console.log = function() {
+                    // Call the original console.log
+                    window.console._originalLog.apply(console, arguments);
+                    
+                    // Add to debug panel
+                    const panel = document.getElementById('debug-panel');
+                    if (panel) {
+                        const text = Array.from(arguments).join(' ');
+                        panel.innerHTML += text + '<br>';
+                        panel.scrollTop = panel.scrollHeight;
+                        
+                        // Limit the number of lines to avoid memory issues
+                        if (panel.innerHTML.split('<br>').length > 100) {
+                            const lines = panel.innerHTML.split('<br>');
+                            panel.innerHTML = lines.slice(lines.length - 100).join('<br>');
+                        }
+                    }
+                };
+            }
+            
+            // Global error handler
+            window.onerror = function(message, source, lineno, colno, error) {
+                showError("Game Error: " + message);
+                console.error("ERROR:", message, "at", source, ":", lineno, ":", colno);
+                return true; // Prevent default error handling
+            };
+            
+            // Function to show error messages
+            function showError(message) {
+                document.getElementById('loading').style.display = 'none';
+                
+                const errorContainer = document.getElementById('error-container');
+                const errorMessage = document.getElementById('error-message');
+                
+                errorMessage.textContent = message;
+                errorContainer.style.display = 'block';
+            }
+            
+            // Setup retry button
+            document.getElementById('retry-button').addEventListener('click', function() {
+                location.reload();
+            });
+            
+            // Check for THREE.js and CANNON.js
+            if (typeof THREE === 'undefined') {
+                showError("THREE.js library is missing. Please check your internet connection and try again.");
+                return;
+            }
+            
+            if (typeof CANNON === 'undefined') {
+                showError("CANNON.js physics library is missing. Please check your internet connection and try again.");
+                return;
+            }
+            
+            // Check for WebGL support
+            if (!hasWebGL()) {
+                showError("Your browser does not support WebGL, which is required to run this game. Please try a different browser.");
+                return;
+            }
+            
+            // Start the game
+            try {
+                console.log("Starting game...");
+                // Initialize the game
+                window.game = new Game();
+                
+                // Hide loading message
+                document.getElementById('loading').style.display = 'none';
+            } catch (error) {
+                console.error("Error starting game:", error);
+                showError("Failed to start the game: " + error.message);
+            }
+        });
+        
+        // Check for WebGL support
+        function hasWebGL() {
+            try {
+                const canvas = document.createElement('canvas');
+                return !!window.WebGLRenderingContext && 
+                    (canvas.getContext('webgl') || canvas.getContext('experimental-webgl'));
+            } catch (e) {
+                return false;
+            }
+        }
+    </script>
+</body>
+</html> 
