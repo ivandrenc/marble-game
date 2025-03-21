@@ -9,17 +9,17 @@ class Terrain {
         
         // Terrain generation parameters with improved values
         this.circleRadius = 2.5;      // Radius of target circle (1m diameter)
-        this.rimWidth = 0.5;          // Width of the rim
-        this.rimHeight = 0.05;        // Height of the rim
-        this.holeDepth = 0.15;        // Depth of the hole
+        this.rimWidth = 2;          // Width of the rim
+        this.rimHeight = 0.02;        // Height of the rim
+        this.holeDepth = 0.4;        // Depth of the hole
         this.centerHoleRadius = 0.3;  // 10cm wide center hole (5cm radius)
         this.centerHoleDepth = 0.2;   // 5cm deep center hole
         this.bumpiness = 0.05;        // Increased for better small-scale terrain details (5cm)
         this.smallBumpFrequency = 0.15; // Higher frequency for more micro terrain features
         this.rockDensity = 0.01;      // 5% chance of rocks (increased from 3%)
         this.largeRockCount = 8;      // More rock formations
-        this.hillCount = 6;           // More small hills outside the target area
-        this.infiniteGridSize = 100;  // Extend background terrain grid this far
+        this.hillCount = 23;           // More small hills outside the target area
+        this.infiniteGridSize = 500;  // Extend background terrain grid this far
         
         // Load textures for shader-based terrain
         console.log("Starting texture loading in constructor...");
@@ -293,11 +293,20 @@ class Terrain {
                 vec2 uvScaled = vUV;
                 
                 // Using step functions for cleaner transitions like in the example
-                vec4 dirt = (smoothstep(0.01, 0.25, height) - smoothstep(0.30, 0.35, height)) * texture2D(oceanTexture, uvScaled * 10.0);
-                vec4 sandy = (smoothstep(0.24, 0.27, height) - smoothstep(0.28, 0.31, height)) * texture2D(sandyTexture, uvScaled * 10.0);
-                vec4 grass = (smoothstep(0.28, 0.32, height) - smoothstep(0.35, 0.40, height)) * texture2D(grassTexture, uvScaled * 20.0);
-                vec4 rocky = (smoothstep(0.30, 0.50, height) - smoothstep(0.60, 0.70, height)) * texture2D(rockyTexture, uvScaled * 20.0);
-                vec4 snowy = (smoothstep(0.65, 0.70, height)) * texture2D(snowyTexture, uvScaled * 10.0);
+                // Dirt covers most of the terrain
+                vec4 dirt = (smoothstep(0.01, 0.15, height) - smoothstep(0.45, 0.55, height)) * texture2D(oceanTexture, uvScaled * 10.0);
+                
+                // Small sand patches in specific areas
+                vec4 sandy = (smoothstep(0.10, 0.15, height) - smoothstep(0.15, 0.20, height)) * 0.7 * texture2D(sandyTexture, uvScaled * 10.0);
+                
+                // Minimal grass - very subtle
+                vec4 grass = (smoothstep(0.35, 0.40, height) - smoothstep(0.42, 0.45, height)) * 0.3 * texture2D(grassTexture, uvScaled * 20.0);
+                
+                // Rock appears on higher elevations
+                vec4 rocky = (smoothstep(0.50, 0.60, height) - smoothstep(0.70, 0.75, height)) * texture2D(rockyTexture, uvScaled * 20.0);
+                
+                // Snow only on the highest peaks
+                vec4 snowy = (smoothstep(0.70, 0.75, height)) * texture2D(snowyTexture, uvScaled * 10.0);
                 
                 // Blend all textures together
                 gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0) + dirt + sandy + grass + rocky + snowy;
