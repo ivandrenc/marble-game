@@ -1,8 +1,17 @@
 {
+  "name": "condor-adventure",
+  "version": "1.0.0",
+  "description": "A 3D game where you control a condor flying over South America",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
   "dependencies": {
-    "three": "^0.174.0"
+    "three": "^0.160.0"
   },
   "devDependencies": {
-    "vite": "^6.2.2"
+    "vite": "^5.0.10"
   }
-}
+} 
